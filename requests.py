@@ -46,7 +46,6 @@ def remove_photo(user_id, number):
     result = cursor.fetchone()
     photo_path = result[0]
     cursor.execute('DELETE FROM photos WHERE user_id = ? AND number = ?', (user_id, number))
-    # update_number(user_id)
     conn.commit()
     conn.close()
     os.remove(photo_path)
