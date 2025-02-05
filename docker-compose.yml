@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  db:
+    build: .
+    container_name: postgres_container
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: inst_bot
+      POSTGRES_USER: Erik
+      POSTGRES_PASSWORD: 12456
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./photos:/Inst_Bot/photos
+
+volumes:
+  pgdata:
