@@ -30,8 +30,11 @@ class Exp(StatesGroup):
 
 @dp.message(Command('start'))
 async def start(message: Message):
-    add_user(message.from_user.username, message.from_user.id)
-    await message.answer('Главное меню:', reply_markup=get_main_menu())
+    if len(get_all_users()) < 500:
+        add_user(message.from_user.username, message.from_user.id)
+        await message.answer('Главное меню:', reply_markup=get_main_menu())
+    else:
+        await message.answer('Бот может зарегистрировать не больше 500 пользователей.')
 
 
 # Меню "Фото"

@@ -19,7 +19,6 @@ def init_db():
         password=DB_PASSWORD,
         host=DB_HOST,
         port=DB_PORT,
-        # options="-c client_encoding=UTF8"
     )
     cursor = conn.cursor()
 
