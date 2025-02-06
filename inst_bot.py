@@ -73,12 +73,11 @@ async def photo_menu_callback(callback_query: CallbackQuery):
 
 # Загрузка нового фото
 @dp.callback_query(lambda c: c.data == 'upload_photo')
-async def upload_photo_callback(callback_query: CallbackQuery):
+async def upload_photo_callback(callback_query: CallbackQuery, state: FSMContext):
     await callback_query.answer("Пожалуйста, отправьте ваше фото.")
-    await cmd_upload_photo(callback_query.message)
+    await state.set_state(Exp.upload_photo)
 
-
-@dp.message(F.photo)
+@dp.message(Exp.upload_photo)
 async def cmd_upload_photo(message: Message):
     username = message.from_user.username
     user_id = get_user_id(username)
@@ -114,8 +113,6 @@ async def process_delete_photo(message: Message, state: FSMContext):
         await message.answer(f"Фотография {number} удалена.")
     except Exception as e:
         await message.answer(f"Произошла ошибка при удалении фотографии: {e}")
-    finally:
-        await state.clear()
     await message.answer('Выберите действие:', reply_markup=get_photo_list())
 
 
