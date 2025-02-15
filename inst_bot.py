@@ -61,8 +61,9 @@ async def saved_photo_callback(callback_query: CallbackQuery):
     if not photos:
         await callback_query.message.answer('У вас нет сохраненных фото.')
         await callback_query.message.answer('Фото:', reply_markup=get_photo_menu())
-    photo_list_keyboard = get_photo_list(photos)
-    await callback_query.message.answer('Выберите фото:', reply_markup=photo_list_keyboard)
+    else:
+        photo_list_keyboard = get_photo_list(photos)
+        await callback_query.message.answer('Выберите фото:', reply_markup=photo_list_keyboard)
 
 
 @dp.callback_query(lambda c: c.data.startswith('view_photo:'))
@@ -75,7 +76,7 @@ async def view_photo_callback(callback_query: CallbackQuery):
     if photos:
         photo_path = photos[photo]
         photo_file = FSInputFile(photo_path)
-        await callback_query.message.answer_photo(photo_file, reply_markup=get_photo_del())
+        await callback_query.message.answer_photo(photo_file, reply_markup=get_photo_del(photo))
     else:
         await callback_query.message.answer('У вас нет сохраненных фото.')
         await callback_query.message.answer('Фото:', reply_markup=get_photo_menu())
@@ -105,29 +106,26 @@ async def cmd_upload_photo(message: Message):
             await message.answer("Фото сохранено!")
         else:
             await message.answer("Вы можете сохранить только до 10 фото.")
-        await message.answer('Выберите действие;', reply_markup=get_photo_del())
+        await message.answer('Выберите действие;', reply_markup=get_photo_menu())
     else:
         await message.answer("Пожалуйста, отправьте фотографию.")
 
 
 # Удаление фотографии
-@dp.callback_query(lambda c: c.data == 'delete')
-async def delete_photo_callback(callback_query: CallbackQuery, state: FSMContext):
-    await callback_query.answer("Какую фотографию вы хотите удалить?")
-    await state.set_state(Exp.del_photo)
-
-
-@dp.message(Exp.del_photo)
-async def process_delete_photo(message: Message, state: FSMContext):
-    username = message.from_user.username
+@dp.callback_query(lambda c: c.data.startswith('delete:'))
+async def delete_photo_callback(callback_query: CallbackQuery):
+    _, photo = callback_query.data.split(':')
+    photo = int(photo)
+    username = callback_query.from_user.username
     user_id = get_user_id(username)
+    photos = get_user_photos(user_id)
+    photo_path = photos[photo]
     try:
-        number = int(message.text.strip())
-        remove_photo(user_id, number)
-        await message.answer(f"Фотография {number} удалена.")
+        remove_photo(user_id, photo_path)
+        await callback_query.message.answer('Фото успешно удалено.')
     except Exception as e:
-        await message.answer(f"Произошла ошибка при удалении фотографии: {e}")
-    await message.answer('Выберите действие:', reply_markup=get_photo_del())
+        await callback_query.message.answer(f"Произошла ошибка при удалении фотографии: {e}")
+    await callback_query.message.answer('Выберите фото:', reply_markup=get_photo_menu())
 
 
 # Меню "Подписки"

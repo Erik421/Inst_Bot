@@ -39,27 +39,13 @@ def get_user_photos(user_id):
     return [photo[0] for photo in photos]
 
 
-def update_number(user_id):
+def remove_photo(user_id, photo):
     conn = connect_db()
     cursor = conn.cursor()
-    cursor.execute('SELECT photo_id FROM photos WHERE user_id = %s ORDER BY number', (user_id,))
-    photos = cursor.fetchall()
-    for new_number, photo in enumerate(photos, start=1):
-        photo_id = photo[0]
-        cursor.execute('UPDATE photos SET number = %s WHERE photo_id = %s', (new_number, photo_id))
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-
-def remove_photo(user_id, number):
-    conn = connect_db()
-    cursor = conn.cursor()
-    update_number(user_id)
-    cursor.execute('SELECT photo FROM photos WHERE user_id = %s AND number = %s', (user_id, number,))
+    cursor.execute('SELECT photo FROM photos WHERE user_id = %s AND photo = %s', (user_id, photo,))
     result = cursor.fetchone()
     photo_path = result[0]
-    cursor.execute('DELETE FROM photos WHERE user_id = %s AND number = %s', (user_id, number))
+    cursor.execute('DELETE FROM photos WHERE user_id = %s AND photo = %s', (user_id, photo))
     conn.commit()
     cursor.close()
     conn.close()
