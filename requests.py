@@ -123,8 +123,8 @@ def unsubscribe_user(user_id, sub_username):
 def get_all_users():
     conn = connect_db()
     cursor = conn.cursor()
-    cursor.execute('SELECT tg_id FROM users')
+    cursor.execute('SELECT tg_id, username FROM users')
     users = cursor.fetchall()
     cursor.close()
     conn.close()
-    return [{'tg_id': user[0]} for user in users]
+    return [{'tg_id': user[0],  'username': user[1]} for user in users]

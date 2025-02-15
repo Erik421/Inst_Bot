@@ -29,7 +29,15 @@ def get_photo_menu():
     return photo_key
 
 
-def get_photo_list():
+def get_photo_list(photos):
+    photo_list = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=f"Фото {i+1}", callback_data=f"view_photo:{i}")]
+            for i, _ in enumerate(photos)])
+    photo_list.append([InlineKeyboardButton(text="Назад", callback_data="back1")])
+    return photo_list
+
+
+def get_photo_del():
     photo_key2 = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text='Удалить', callback_data='delete'),

@@ -1,5 +1,5 @@
 import asyncio
-from aiogram import Bot, Dispatcher, F
+from aiogram import Bot, Dispatcher
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, FSInputFile, InputMediaPhoto
 from aiogram.filters import Command
@@ -58,10 +58,24 @@ async def saved_photo_callback(callback_query: CallbackQuery):
     username = callback_query.from_user.username
     user_id = get_user_id(username)
     photos = get_user_photos(user_id)
+    if not photos:
+        await callback_query.message.answer('У вас нет сохраненных фото.')
+        await callback_query.message.answer('Фото:', reply_markup=get_photo_menu())
+    photo_list_keyboard = get_photo_list(photos)
+    await callback_query.message.answer('Выберите фото:', reply_markup=photo_list_keyboard)
+
+
+@dp.callback_query(lambda c: c.data.startswith('view_photo:'))
+async def view_photo_callback(callback_query: CallbackQuery):
+    _, photo = callback_query.data.split(':')
+    photo = int(photo)
+    username = callback_query.from_user.username
+    user_id = get_user_id(username)
+    photos = get_user_photos(user_id)
     if photos:
-        media_group = [InputMediaPhoto(media=FSInputFile(photo)) for photo in photos]
-        await callback_query.message.answer_media_group(media_group)
-        await callback_query.message.answer('Выберите действие:', reply_markup=get_photo_list())
+        photo_path = photos[photo]
+        photo_file = FSInputFile(photo_path)
+        await callback_query.message.answer_photo(photo_file, reply_markup=get_photo_del())
     else:
         await callback_query.message.answer('У вас нет сохраненных фото.')
         await callback_query.message.answer('Фото:', reply_markup=get_photo_menu())
@@ -74,7 +88,7 @@ async def photo_menu_callback(callback_query: CallbackQuery):
 # Загрузка нового фото
 @dp.callback_query(lambda c: c.data == 'upload_photo')
 async def upload_photo_callback(callback_query: CallbackQuery, state: FSMContext):
-    await callback_query.answer("Пожалуйста, отправьте ваше фото.")
+    await callback_query.message.answer("Пожалуйста, отправьте ваше фото.")
     await state.set_state(Exp.upload_photo)
 
 @dp.message(Exp.upload_photo)
@@ -91,7 +105,7 @@ async def cmd_upload_photo(message: Message):
             await message.answer("Фото сохранено!")
         else:
             await message.answer("Вы можете сохранить только до 10 фото.")
-        await message.answer('Выберите действие;', reply_markup=get_photo_list())
+        await message.answer('Выберите действие;', reply_markup=get_photo_del())
     else:
         await message.answer("Пожалуйста, отправьте фотографию.")
 
@@ -113,7 +127,7 @@ async def process_delete_photo(message: Message, state: FSMContext):
         await message.answer(f"Фотография {number} удалена.")
     except Exception as e:
         await message.answer(f"Произошла ошибка при удалении фотографии: {e}")
-    await message.answer('Выберите действие:', reply_markup=get_photo_list())
+    await message.answer('Выберите действие:', reply_markup=get_photo_del())
 
 
 # Меню "Подписки"
@@ -139,7 +153,7 @@ async def my_subs_callback(callback_query: CallbackQuery, state: FSMContext):
 # Поиск подписчиков
 @dp.callback_query(lambda c: c.data == 'search')
 async def search_callback(callback_query: CallbackQuery, state: FSMContext):
-    await callback_query.answer('Введите имя пользователя, на которого хотите подписаться:')
+    await callback_query.message.answer('Введите имя пользователя, на которого хотите подписаться:')
     await state.set_state(Exp.sub_message)
 
 
@@ -232,7 +246,7 @@ async def cmd_sup(message: Message):
 # Отправка сообщения в техподдержку
 @dp.callback_query(lambda c: c.data == 'sup_mes')
 async def sup_mes_callback(callback_query: CallbackQuery, state: FSMContext):
-    await callback_query.answer("Напишите свое сообщение:")
+    await callback_query.message.answer("Напишите свое сообщение:")
     await state.set_state(Exp.support_message)
 
 
@@ -266,12 +280,25 @@ async def broadcast_command(message: Message, state: FSMContext):
 async def process_broadcast_message(message: Message, state: FSMContext):
     text = message.text
     users = get_all_users()
+    successful_users = []
+    failed_users = []
     for user in users:
         try:
             await bot.send_message(user['tg_id'], text)
-            await message.answer("Сообщение успешно отправлено всем пользователям.")
+            successful_users.append(user['username'])
         except Exception as e:
-            await message.answer(f"Ошибка при отправке сообщения пользователю {user['tg_id']}: {e}")
+            failed_users.append((user['username'], str(e)))
+    success_message = "Сообщение успешно отправлено следующим пользователям:\n" + "\n".join(
+            [f"@{username}" for username in successful_users])
+    if failed_users:
+        failure_message = "Произошли ошибки при отправке сообщений следующим пользователям:\n" + "\n".join(
+            [f"@{username}: {error}" for username, error in failed_users])
+    else:
+        failure_message = ""
+    admin_message = success_message
+    if failure_message:
+        admin_message += "\n\n" + failure_message
+    await bot.send_message(ADMIN_ID, admin_message)
     await state.clear()
 
 
