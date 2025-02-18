@@ -1,5 +1,6 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+
 def get_main_menu():
     markup = InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -23,24 +24,18 @@ def get_photo_menu():
         ],
         [
             InlineKeyboardButton(text='Меню', callback_data='menu'),
-            InlineKeyboardButton(text='Назад', callback_data='back1'),
+            InlineKeyboardButton(text='Назад', callback_data='menu'),
         ],
     ])
     return photo_key
 
 
 def get_photo_list(photos):
-    photo_list = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text=f"Фото {i+1}", callback_data=f"view_photo:{i}")
-            for i, _ in enumerate(photos)
-        ],
-        [
-            InlineKeyboardButton(text="Назад", callback_data="photo_menu")
-        ]
-
-    ])
-    return photo_list
+    photo_list = []
+    for i, _ in enumerate(photos):
+        photo_list.append([InlineKeyboardButton(text=f"Фото {i+1}", callback_data=f"view_photo:{i}")])
+    photo_list.append([InlineKeyboardButton(text="Назад", callback_data="photo_menu")])
+    return InlineKeyboardMarkup(inline_keyboard=photo_list)
 
 
 def get_photo_del(photo):
@@ -119,16 +114,6 @@ def get_support_menu():
         ],
     ])
     return sup_key
-
-
-def back_to_menu():
-    back_key1 = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text='Меню', callback_data='menu'),
-            InlineKeyboardButton(text='Назад', callback_data='back'),
-        ],
-    ])
-    return back_key1
 
 
 def get_accept_menu():

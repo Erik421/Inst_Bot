@@ -1,9 +1,19 @@
-from db import *
+import os
+from dotenv import load_dotenv
+import asyncpg
+
+load_dotenv()
+
+DB_NAME = os.getenv('DB_NAME')
+DB_USER = os.getenv('DB_USER')
+DB_PASSWORD = os.getenv('DB_PASSWORD')
+DB_HOST = os.getenv('DB_HOST')
+DB_PORT = os.getenv('DB_PORT')
 
 
-def connect_db():
-    return psycopg2.connect(
-        dbname=DB_NAME,
+async def connect_db():
+    return await asyncpg.connect(
+        database=DB_NAME,
         user=DB_USER,
         password=DB_PASSWORD,
         host=DB_HOST,
@@ -11,106 +21,98 @@ def connect_db():
     )
 
 
-def add_user(username, tg_id):
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute('INSERT INTO users (username, tg_id) VALUES (%s, %s) ON CONFLICT (username) DO NOTHING', (username, tg_id))
-    conn.commit()
-    cursor.close()
-    conn.close()
+async def add_user(username, tg_id):
+    conn = await connect_db()
+    await conn.execute('''
+        INSERT INTO users (username, tg_id) VALUES ($1, $2)
+        ON CONFLICT (username) DO NOTHING
+    ''', username, tg_id)
+    await conn.close()
 
 
-def add_photo(user_id, photo):
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute('INSERT INTO photos (user_id, photo) VALUES (%s, %s)', (user_id, photo))
-    conn.commit()
-    cursor.close()
-    conn.close()
+async def add_photo(user_id, photo):
+    conn = await connect_db()
+    await conn.execute('''
+        INSERT INTO photos (user_id, photo) VALUES ($1, $2)
+    ''', user_id, photo)
+    await conn.close()
 
 
-def get_user_photos(user_id):
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT photo FROM photos WHERE user_id = %s', (user_id,))
-    photos = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return [photo[0] for photo in photos]
+async def get_user_photos(user_id):
+    conn = await connect_db()
+    photos = await conn.fetch('''
+        SELECT photo FROM photos WHERE user_id = $1
+    ''', user_id)
+    await conn.close()
+    return [photo['photo'] for photo in photos]
 
 
-def remove_photo(user_id, photo):
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT photo FROM photos WHERE user_id = %s AND photo = %s', (user_id, photo,))
-    result = cursor.fetchone()
-    photo_path = result[0]
-    cursor.execute('DELETE FROM photos WHERE user_id = %s AND photo = %s', (user_id, photo))
-    conn.commit()
-    cursor.close()
-    conn.close()
-    os.remove(photo_path)
+async def remove_photo(user_id, photo):
+    conn = await connect_db()
+    photo_path = await conn.fetchval('''
+        SELECT photo FROM photos WHERE user_id = $1 AND photo = $2
+    ''', user_id, photo)
+    if photo_path:
+        await conn.execute('''
+            DELETE FROM photos WHERE user_id = $1 AND photo = $2
+        ''', user_id, photo)
+        os.remove(photo_path)
+    await conn.close()
 
 
-def add_subscription(sub_username, user_id):
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute('''INSERT INTO subscriptions (sub_username, user_id) VALUES (%s, %s)
-                   ON CONFLICT(sub_username) DO UPDATE SET user_id = excluded.user_id''', (sub_username, user_id))
-    conn.commit()
-    cursor.close()
-    conn.close()
+async def add_subscription(sub_username, user_id):
+    conn = await connect_db()
+    await conn.execute('''
+        INSERT INTO subscriptions (sub_username, user_id) VALUES ($1, $2)
+        ON CONFLICT (sub_username) DO UPDATE SET user_id = excluded.user_id
+    ''', sub_username, user_id)
+    await conn.close()
 
 
-def get_user_subscriptions(user_id):
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT sub_username FROM subscriptions WHERE user_id = %s', (user_id,))
-    subscriptions = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return [subscription[0] for subscription in subscriptions]
+async def get_user_subscriptions(user_id):
+    conn = await connect_db()
+    subscriptions = await conn.fetch('''
+        SELECT sub_username FROM subscriptions WHERE user_id = $1
+    ''', user_id)
+    await conn.close()
+    return [subscription['sub_username'] for subscription in subscriptions]
 
 
-def get_user_id(username):
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT user_id FROM users WHERE username = %s', (username,))
-    user_id = cursor.fetchone()
-    cursor.close()
-    conn.close()
-    return user_id[0] if user_id else None
+async def get_user_id(username):
+    conn = await connect_db()
+    user_id = await conn.fetchval('''
+        SELECT user_id FROM users WHERE username = $1
+    ''', username)
+    await conn.close()
+    return user_id
 
 
-def is_valid_username(username):
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT COUNT(*) FROM users WHERE username = %s', (username,))
-    count = cursor.fetchone()[0]
-    cursor.close()
-    conn.close()
+async def is_valid_username(username):
+    conn = await connect_db()
+    count = await conn.fetchval('''
+        SELECT COUNT(*) FROM users WHERE username = $1
+    ''', username)
+    await conn.close()
     return bool(count)
 
 
-def subscribe_user(user_id, username):
-    if is_valid_username(username):
-        add_subscription(username, user_id)
+async def subscribe_user(user_id, username):
+    if await is_valid_username(username):
+        await add_subscription(username, user_id)
 
 
-def unsubscribe_user(user_id, sub_username):
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM subscriptions WHERE user_id = %s AND sub_username = %s', (user_id, sub_username))
-    conn.commit()
-    cursor.close()
-    conn.close()
+async def unsubscribe_user(user_id, sub_username):
+    conn = await connect_db()
+    await conn.execute('''
+        DELETE FROM subscriptions WHERE user_id = $1 AND sub_username = $2
+    ''', user_id, sub_username)
+    await conn.close()
 
 
-def get_all_users():
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT tg_id, username FROM users')
-    users = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return [{'tg_id': user[0],  'username': user[1]} for user in users]
+async def get_all_users():
+    conn = await connect_db()
+    users = await conn.fetch('''
+        SELECT tg_id, username FROM users
+    ''')
+    await conn.close()
+    return [{'tg_id': user['tg_id'], 'username': user['username']} for user in users]
