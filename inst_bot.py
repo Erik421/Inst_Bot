@@ -2,25 +2,17 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, FSInputFile, InputMediaPhoto
 from aiogram.filters import Command
-from aiogram.fsm.state import StatesGroup, State
 
 from buttons import *
 from requests import *
+from states import Exp
 
-
-TOKEN = '7343306090:AAGYlEIBVwE9heIzPr54kWwTBXbVBFKVD3E'
-ADMIN_ID = '550649516'
+TOKEN = os.getenv('TOKEN')
+ADMIN_ID = os.getenv('ADMIN_ID')
 
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
-
-
-class Exp(StatesGroup):
-    upload_photo = State()
-    support_message = State()
-    admin_message = State()
-    sub_message = State()
 
 
 @dp.message(Command('start'))
@@ -39,19 +31,13 @@ async def photo_callback(callback_query: CallbackQuery):
 
 
 @dp.callback_query(lambda c: c.data == 'menu')
-async def menu1_callback(callback_query: CallbackQuery):
-    await callback_query.message.answer('Главное меню: ', reply_markup=get_main_menu())
-
-
-@dp.callback_query(lambda c: c.data == 'menu')
 async def back1_callback(callback_query: CallbackQuery):
     await callback_query.message.answer('Главное меню: ', reply_markup=get_main_menu())
 
 # Просмотр сохранённых фото
 @dp.callback_query(lambda c: c.data == 'saved_photo')
 async def saved_photo_callback(callback_query: CallbackQuery):
-    username = callback_query.from_user.username
-    user_id = await get_user_id(username)
+    user_id = callback_query.from_user.id
     photos = await get_user_photos(user_id)
     if not photos:
         await callback_query.message.answer('У вас нет сохраненных фото.')
@@ -64,8 +50,7 @@ async def saved_photo_callback(callback_query: CallbackQuery):
 async def view_photo_callback(callback_query: CallbackQuery):
     photo = callback_query.data.split(':')[1]
     photo = int(photo)
-    username = callback_query.from_user.username
-    user_id = await get_user_id(username)
+    user_id = callback_query.from_user.id
     photos = await get_user_photos(user_id)
     if photos:
         photo_path = photos[photo]
@@ -90,14 +75,13 @@ async def upload_photo_callback(callback_query: CallbackQuery, state: FSMContext
 
 @dp.message(Exp.upload_photo)
 async def cmd_upload_photo(message: Message, state: FSMContext):
-    username = message.from_user.username
-    user_id = await get_user_id(username)
-    if len(await get_user_photos(user_id)) >= 10:
+    user_id = message.from_user.id
+    if not message.photo:
+        await message.answer("Пожалуйста, отправьте ваше фото.")
+    elif len(await get_user_photos(user_id)) >= 10:
         await message.answer("Вы можете сохранить только до 10 фото.")
         await state.clear()
         await message.answer('Фото;', reply_markup=get_photo_menu())
-    elif not message.photo:
-        await message.answer("Пожалуйста, отправьте ваше фото.")
     else:
         file_id = message.photo[-1].file_id
         file = await bot.get_file(file_id)
@@ -114,8 +98,7 @@ async def cmd_upload_photo(message: Message, state: FSMContext):
 async def delete_photo_callback(callback_query: CallbackQuery):
     photo = callback_query.data.split(':')[1]
     photo = int(photo)
-    username = callback_query.from_user.username
-    user_id = await get_user_id(username)
+    user_id = callback_query.from_user.id
     photos = await get_user_photos(user_id)
     photo_path = photos[photo]
     try:
@@ -135,8 +118,7 @@ async def subs_callback(callback_query: CallbackQuery):
 # Мои подписки
 @dp.callback_query(lambda c: c.data == 'my_subs')
 async def my_subs_callback(callback_query: CallbackQuery, state: FSMContext):
-    username = callback_query.from_user.username
-    user_id = await get_user_id(username)
+    user_id = callback_query.from_user.id
     subs = await get_user_subscriptions(user_id)
     if not subs:
         await bot.send_message(callback_query.from_user.id, "У вас нет подписок.")
@@ -155,13 +137,13 @@ async def search_callback(callback_query: CallbackQuery, state: FSMContext):
 @dp.message(Exp.sub_message)
 async def process_search(message: Message, state: FSMContext):
     sub_username = message.text.strip()
-    username = message.from_user.username
-    user_id = await get_user_id(username)
-    if len(await get_user_subscriptions(user_id)) >= 20:
+    user_id = message.from_user.id
+    subscriptions = await get_user_subscriptions(user_id)
+    if len(subscriptions) >= 20:
         await message.answer("Вы можете подписаться только на 20 пользователей.")
         await state.clear()
         await message.answer('Подписки:', reply_markup=get_subscriptions_menu())
-    elif sub_username in await get_user_subscriptions(user_id):
+    elif sub_username in subscriptions:
         await message.answer(f"Вы уже подписаны на @{sub_username}.")
         await state.clear()
         await message.answer('Подписки:', reply_markup=get_subscriptions_menu())
@@ -179,7 +161,6 @@ async def process_select_user(callback_query: CallbackQuery, state: FSMContext):
     sub_username = callback_query.data.split(':')[1]
     await state.update_data(selected_user=sub_username)
     await callback_query.message.answer(f"Вы выбрали @{sub_username}. Что вы хотите сделать?", reply_markup=get_profile_menu())
-    # await state.set_state(Exp.confirm_unsub)
 
 
 # Отключение от подписки
@@ -188,15 +169,13 @@ async def unsub_callback(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     sub_username = data.get('selected_user')
     await callback_query.message.answer(f"Вы уверены, что хотите отписаться от @{sub_username}?", reply_markup=get_accept_menu())
-    # await state.set_state(Exp.confirm_unsub)
 
 
 @dp.callback_query(lambda c: c.data == 'accept')
 async def process_confirm_unsub(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     sub_username = data.get('selected_user')
-    username = callback_query.from_user.username
-    user_id = await get_user_id(username)
+    user_id = callback_query.from_user.id
     await unsubscribe_user(user_id, sub_username)
     await callback_query.message.answer(f"Вы успешно отписались от @{sub_username}.")
     await callback_query.message.answer('Подписки:', reply_markup=get_subscriptions_menu())
@@ -284,7 +263,7 @@ async def process_broadcast_message(message: Message, state: FSMContext):
     failed_users = []
     for user in users:
         try:
-            await bot.send_message(user['tg_id'], text)
+            await bot.send_message(user['user_id'], text)
             successful_users.append(user['username'])
         except Exception as e:
             failed_users.append((user['username'], str(e)))

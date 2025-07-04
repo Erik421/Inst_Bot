@@ -1,32 +1,12 @@
-import os
-from dotenv import load_dotenv
-import asyncpg
-
-load_dotenv()
-
-DB_NAME = os.getenv('DB_NAME')
-DB_USER = os.getenv('DB_USER')
-DB_PASSWORD = os.getenv('DB_PASSWORD')
-DB_HOST = os.getenv('DB_HOST')
-DB_PORT = os.getenv('DB_PORT')
+from db import *
 
 
-async def connect_db():
-    return await asyncpg.connect(
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT
-    )
-
-
-async def add_user(username, tg_id):
+async def add_user(username, user_id):
     conn = await connect_db()
     await conn.execute('''
-        INSERT INTO users (username, tg_id) VALUES ($1, $2)
+        INSERT INTO users (username, user_id) VALUES ($1, $2)
         ON CONFLICT (username) DO NOTHING
-    ''', username, tg_id)
+    ''', username, user_id)
     await conn.close()
 
 
@@ -112,7 +92,7 @@ async def unsubscribe_user(user_id, sub_username):
 async def get_all_users():
     conn = await connect_db()
     users = await conn.fetch('''
-        SELECT tg_id, username FROM users
+        SELECT user_id, username FROM users
     ''')
     await conn.close()
-    return [{'tg_id': user['tg_id'], 'username': user['username']} for user in users]
+    return [{'user_id': user['user_id'], 'username': user['username']} for user in users]

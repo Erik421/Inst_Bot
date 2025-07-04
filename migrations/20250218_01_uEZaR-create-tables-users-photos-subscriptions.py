@@ -10,8 +10,7 @@ __depends__ = {}
 steps = [
     step("""
         CREATE TABLE IF NOT EXISTS users (
-            user_id SERIAL PRIMARY KEY,
-            tg_id BIGINT NOT NULL,
+            user_id INTEGER PRIMARY KEY,
             username VARCHAR(255) UNIQUE
         )
     """),
@@ -20,7 +19,6 @@ steps = [
             photo_id SERIAL PRIMARY KEY,
             user_id INTEGER,
             photo TEXT NOT NULL,
-            number INTEGER,
             FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
         )
     """),
